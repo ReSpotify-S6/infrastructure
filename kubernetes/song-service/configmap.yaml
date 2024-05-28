@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: song-service-configmap
+data:
+  DB_NAME: songs
+  DB_USERNAME: admin

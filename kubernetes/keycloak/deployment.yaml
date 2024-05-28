@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - protocol: TCP
+      port: 8443
+      targetPort: 8443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      restartPolicy: Never
+      containers:
+        - args: ['--verbose', 'start']
+          env:
+            - name: KC_DB
+              value: 'postgres'
+            - name: KC_DB_URL
+              value: 'jdbc:postgresql://kc-db/keycloak'
+            - name: KC_DB_USERNAME
+              value: 'keycloak'
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secrets
+                  key: KC_DB_PASSWORD
+            - name: KC_HOSTNAME_ADMIN_URL
+              value: 'https://auth.respotify.org'
+            - name: KC_HOSTNAME_URL
+              value: 'https://auth.respotify.org'
+            - name: KC_HOSTNAME_STRICT_HTTPS
+              value: "true"
+            - name: KC_HTTPS_PORT
+              value: '8443'
+            - name: KEYCLOAK_ADMIN
+              value: 'admin'
+            - name: KC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secrets
+                  key: KC_PASSWORD
+            - name: KC_HTTPS_CERTIFICATE_FILE
+              value: '/etc/ssl/tls.crt'
+            - name: KC_HTTPS_CERTIFICATE_KEY_FILE
+              value: '/etc/ssl/tls.key'
+          image: quay.io/keycloak/keycloak:24.0.1
+          name: keycloak
+          ports:
+            - name: https
+              containerPort: 8443
+          volumeMounts:
+            - name: kc-db-storage
+              mountPath: /opt/jboss/keycloak/standalone/data
+            - name: tls
+              mountPath: '/etc/ssl'
+              readOnly: true
+      restartPolicy: Always
+      volumes:
+        - name: kc-db-storage
+          persistentVolumeClaim:
+            claimName: kc-db-pvc
+        - name: tls
+          secret:
+            secretName: tls-secret
+            optional: false
