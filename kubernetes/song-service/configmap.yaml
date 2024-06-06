@@ -3,5 +3,20 @@ kind: ConfigMap
 metadata:
   name: song-service-configmap
 data:
-  DB_NAME: songs
-  DB_USERNAME: admin
+  DB_NAME: postgres
+  DB_USERNAME: postgres
+  init.sql: |
+    START TRANSACTION;
+
+    CREATE TABLE "Songs" (
+        "Id" uuid NOT NULL,
+        "Title" text NOT NULL,
+        "Artist" text NOT NULL,
+        "ImageLink" text NOT NULL,
+        "AudioLink" text NOT NULL,
+        CONSTRAINT "PK_Songs" PRIMARY KEY ("Id")
+    );
+
+    COMMIT;
+
+

@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: song-db
+  name: song-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: song-db
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: song-db
+    spec:
+      containers:
+        - env:
+            - name: PGDATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: song-service-configmap
+                  key: DB_NAME
+            - name: PGUSER
+              valueFrom:
+                configMapKeyRef:
+                  name: song-service-configmap
+                  key: DB_USERNAME 
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: song-service-secrets
+                  key: DB_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/songs
+          image: postgres:latest
+          name: song-db
+          volumeMounts:
+            - name: song-db-volume
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+      restartPolicy: Always
+      volumes:
+        - name: song-db-volume
+          persistentVolumeClaim:
+            claimName: song-db-volume
+        - name: init-scripts
+          configMap:
+            name: song-service-configmap
+            items:
+              - key: init.sql
+                path: init.sql

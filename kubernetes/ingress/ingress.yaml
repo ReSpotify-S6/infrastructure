@@ -3,11 +3,13 @@ kind: Ingress
 metadata:
   name: main-ingress
 spec:
-  ingressClassName: azure-application-gateway
   tls:
-  - hosts:
-    - respotify.org
-    secretName: tls-secret 
+    - hosts:
+      - respotify.org
+      - auth.respotify.org
+      - api.respotify.org
+      secretName: tls-secret
+  ingressClassName: nginx
   rules:
   - host: respotify.org
     http:
@@ -19,16 +21,6 @@ spec:
             name: frontend
             port:
               number: 80
-  - host: api.respotify.org
-    http:
-      paths:
-      - path: /songs
-        pathType: Prefix
-        backend:
-          service:
-            name: song-service
-            port:
-              number: 80
   - host: auth.respotify.org
     http:
       paths:
@@ -38,5 +30,14 @@ spec:
           service:
             name: keycloak
             port:
-              number: 8443
-
+              number: 8080
+  - host: api.respotify.org
+    http:
+      paths:
+      - path: /songs
+        pathType: Prefix
+        backend:
+          service:
+            name: song-service
+            port:
+              number: 8080
