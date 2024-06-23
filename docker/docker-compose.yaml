@@ -9,15 +9,24 @@ services:
       - ./nginx-gateway.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - frontend 
+      - song-service
+      - image-service
+      - audio-service
+    networks:
+      - main
   
   frontend:
     container_name: frontend
     build:
-      context: ../../frontend
+      context: /home/jookz/frontend
       dockerfile: Dockerfile.dev
     volumes:
-      - ../../frontend/src:/app/src
-      - ../../frontend/node_modules:/app/node_modules
+      #- ../../frontend/src:/app/src
+      #- ../../frontend/node_modules:/app/node_modules
+      - /home/jookz/frontend/src:/app/src
+      - /home/jookz/frontend/node_modules:/app/node_modules
+    networks:
+      - main
 
   song-service:
     container_name: song-service
@@ -25,6 +34,9 @@ services:
       context: ../../song-service/SongService
       dockerfile: Dockerfile
     environment:
+      - RABBITMQ_HOSTNAME=rabbitmq
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
       - DB_HOST=song-db
       - DB_PORT=5432
       - DB_USERNAME=postgres
@@ -32,8 +44,15 @@ services:
       - DB_DATABASE=postgres
       - ALLOWED_ORIGINS=http://localhost
       - KC_JWKS_URL=https://auth.respotify.org/realms/respotify-dev/protocol/openid-connect/certs
+      - API_GATEWAY_HOST=http://api.localhost
     depends_on:
       - song-db
+      - rabbitmq
+    networks:
+      - main
+      - rabbitmq
+    ports:
+      - 8080:8080
 
   song-db:
     container_name: song-db
@@ -41,8 +60,6 @@ services:
     environment:
       POSTGRES_DB: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - 5432:5432
     volumes:
       - song-db-volume:/var/lib/postgresql/data
     healthcheck:
@@ -50,40 +67,74 @@ services:
       interval: 5s
       timeout: 5s
       retries: 3
-  
-# IAM
-#  keycloak:
-#    image: quay.io/keycloak/keycloak:24.0.1
-#    container_name: keycloak
-#    environment:
-#      KEYCLOAK_ADMIN: keycloak
-#      KEYCLOAK_ADMIN_PASSWORD: keycloak
-#      KC_HOSTNAME_URL: 'http://auth.localhost'
-#      KC_HOSTNAME_ADMIN_URL: 'http://auth.localhost'
-#      KC_DB_USERNAME: postgres
-#      KC_DB_PASSWORD: postgres
-#      KC_DB: postgres
-#      KC_DB_URL: jdbc:postgresql://keycloak-db/keycloak
-#    command: ["--verbose", "start-dev"]
-#    volumes:
-#      - kc-db-volume:/opt/jboss/keycloak/standalone/data
-#    depends_on:
-#      - keycloak-db
-#
-#  keycloak-db:
-#    container_name: keycloak-db
-#    image: postgres:latest
-#    environment:
-#      POSTGRES_DB: keycloak
-#      POSTGRES_PASSWORD: postgres
-#    volumes:
-#      - kc-db-volume:/var/lib/postgresql/data
-#    healthcheck:
-#      test: ["CMD-SHELL", "pg_isready --username=postgres --dbname=keycloak"]
-#      interval: 5s
-#      timeout: 5s
-#      retries: 3
+    networks:
+      - main
+
+  image-service:
+    container_name: image-service
+    build:
+      context: ../../blob-handler
+      dockerfile: Dockerfile
+    environment:
+      - AZURE_STORAGE_ACCOUNT_NAME=respotify
+      - AZURE_STORAGE_ACCOUNT_KEY=${AZURE_STORAGE_ACCOUNT_KEY}
+      - AZURE_STORAGE_CONTAINER_NAME=images
+      - RABBITMQ_HOSTNAME=rabbitmq
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+      - REDIRECT_URI=http://api.localhost/images
+      - KC_JWKS_URL=https://auth.respotify.org/realms/respotify-dev/protocol/openid-connect/certs
+      - ALLOWED_ORIGINS=http://localhost
+    depends_on:
+      - rabbitmq
+    networks:
+      - main
+      - rabbitmq
+
+  audio-service:
+    container_name: audio-service
+    build:
+      context: ../../blob-handler
+      dockerfile: Dockerfile
+    environment:
+      - AZURE_STORAGE_ACCOUNT_NAME=respotify
+      - AZURE_STORAGE_ACCOUNT_KEY=${AZURE_STORAGE_ACCOUNT_KEY}
+      - AZURE_STORAGE_CONTAINER_NAME=audio
+      - RABBITMQ_HOSTNAME=rabbitmq
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+      - REDIRECT_URI=http://api.localhost/audio
+      - KC_JWKS_URL=https://auth.respotify.org/realms/respotify-dev/protocol/openid-connect/certs
+      - ALLOWED_ORIGINS=http://localhost
+    depends_on:
+      - rabbitmq
+    networks:
+      - main
+      - rabbitmq
+
+  rabbitmq:
+    image: rabbitmq:management-alpine
+    container_name: rabbitmq
+    ports:
+      - 5672:5672
+      - 15672:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - rabbitmq
 
 volumes:
-  kc-db-volume:
   song-db-volume:
+
+networks:
+  main:
+    driver: bridge
+  rabbitmq:
+    driver: bridge

@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: song-service
+  name: image-service
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: song-service
+      app: image-service
   template:
     metadata:
       labels:
-        app: song-service
+        app: image-service
     spec:
       containers:
-      - image: respotify.azurecr.io/song-service
-        name: song-service
+      - image: respotify.azurecr.io/blob-handler
+        name: image-service
         livenessProbe:
           httpGet:
             path: /healthz
@@ -31,6 +31,15 @@ spec:
             cpu: 500m
             memory: 512Mi
         env:
+          - name: AZURE_STORAGE_ACCOUNT_NAME
+            value: respotify
+          - name: AZURE_STORAGE_ACCOUNT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: image-service-secrets
+                key: AZURE_STORAGE_ACCOUNT_KEY
+          - name: AZURE_STORAGE_CONTAINER_NAME
+            value: images
           - name: RABBITMQ_HOSTNAME
             value: rabbitmq
           - name: RABBITMQ_USERNAME
@@ -43,28 +52,9 @@ spec:
               secretKeyRef:
                 name: rabbitmq-credentials
                 key: RABBITMQ_PASSWORD
-          - name: DB_HOST
-            value: 'song-db'
-          - name: DB_PORT
-            value: '5432'
-          - name: DB_USERNAME
-            valueFrom:
-              configMapKeyRef:
-                name: song-service-configmap
-                key: DB_USERNAME
-          - name: DB_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: song-service-secrets
-                key: DB_PASSWORD
-          - name: DB_DATABASE
-            valueFrom:
-              configMapKeyRef:
-                name: song-service-configmap
-                key: DB_NAME
           - name: ALLOWED_ORIGINS
             value: 'https://respotify.org'
           - name: KC_JWKS_URL
             value: 'http://keycloak:8080/realms/respotify/protocol/openid-connect/certs'
-          - name: API_GATEWAY_HOST
-            value: 'https://api.respotify.org'
+          - name: REDIRECT_URI
+            value: https://api.respotify.org/images

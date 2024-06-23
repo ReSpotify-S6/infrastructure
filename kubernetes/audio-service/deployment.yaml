@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audio-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: audio-service
+  template:
+    metadata:
+      labels:
+        app: audio-service
+    spec:
+      containers:
+        - image: respotify.azurecr.io/blob-handler
+          name: audio-service
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 1
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          env:
+            - name: AZURE_STORAGE_ACCOUNT_NAME
+              value: respotify
+            - name: AZURE_STORAGE_ACCOUNT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: audio-service-secrets
+                  key: AZURE_STORAGE_ACCOUNT_KEY
+            - name: AZURE_STORAGE_CONTAINER_NAME
+              value: audio
+            - name: RABBITMQ_HOSTNAME
+              value: rabbitmq
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: RABBITMQ_USERNAME
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: RABBITMQ_PASSWORD
+            - name: ALLOWED_ORIGINS
+              value: 'https://respotify.org'
+            - name: KC_JWKS_URL
+              value: 'http://keycloak:8080/realms/respotify/protocol/openid-connect/certs'
+            - name: REDIRECT_URI
+              value: https://api.respotify.org/audio
